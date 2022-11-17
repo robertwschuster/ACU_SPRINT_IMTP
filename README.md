@@ -1,5 +1,5 @@
 # ACU_SPRINT_IMTP
-R code and shiny app for isometric mid-thigh pull analysis
+R code and *[shiny app](https://robertwschuster.shinyapps.io/imtp_app/?_ga=2.99396375.860522340.1668723870-1384672163.1668580479)* for isometric mid-thigh pull analysis
 
 For the IMTP analysis shiny app:
 1.  Open the files you want to analyse
