@@ -6,7 +6,8 @@
 #
 #-----------------------------------------------------------------------------------------
 
-# Find peaks -----------------------------------------------------------------------------
+# Basic functions ------------------------------------------------------------------------
+# Find peaks
 # https://github.com/stas-g/findPeaks
 # a 'peak' is defined as a local maxima with m points either side of it being smaller than it. 
 # hence, the bigger the parameter m, the more stringent is the peak finding procedure
@@ -23,13 +24,32 @@ find_peaks <- function(x, m = 3) {
   pks
 }
 
+# moving standard deviation
+movstd <- function(vec, width)      
+  return(c(rep(NA,width-1), sapply(seq_along(vec[width:length(vec)]),      
+                                   function(i) sd(vec[i:(i+width-1)]))))
+
+# find rep around a local maximum
+find_rep <- function(fz, fmaxi, width = 500) {
+  cutoff <- movstd(fz[1:fmaxi], width)
+  coi <- which(cutoff == min(cutoff, na.rm = T)) + 1
+  cutoff <- min(cutoff, na.rm = T)
+  
+  baseline <- mean(fz[(coi - width):(coi - 1)])
+  
+  out <- list(start = max(which(fz[1:fmaxi] <= (baseline + cutoff*5))),
+              end = min(which(fz[fmaxi:length(fz)] <= (baseline + cutoff*5))) + fmaxi)
+  return(out)
+}
+
 
 # Load data ------------------------------------------------------------------------------
 importTrial <- function(filepath,filename) {
   cols <- c("Time","Z.Left","Z.Right","Left","Right")
   fn <- basename(filename)
   # determine length of header
-  skip <- read.csv(filepath, nrows = 20, header = F, blank.lines.skip = F)
+  skip <- read.csv(filepath, nrows = 20, header = F, blank.lines.skip = F, 
+                   col.names = paste0("V",seq_len(max(count.fields(filepath, sep = ',')))), fill = T)
   if (any(skip == "Time", na.rm = T)) {
     skip <- which(skip == 'Time')-1
     
@@ -47,7 +67,7 @@ importTrial <- function(filepath,filename) {
       if (any(header == "Weight", na.rm = T)) {
         bodymass <- as.numeric(na.omit(header[header == 'Weight',2])) * 9.81
       } else {
-        bodymass <- median(df$Total)
+        bodymass <- median(df$Total[df$Total >= 300])
       }
       # find frequency
       freq <- as.numeric(na.omit(header[header == 'Frequency',2]))
@@ -91,9 +111,9 @@ nReps <- function(data) {
     # define arbitrary period to look for start and end of rep
     # start of period
     if (p > 1) { # if not first rep
-      ds <- min(data$freq*5, (pks[p]-pks[p-1])/2) # start of period is 5S before max
+      ds <- min(data$freq*7.5, (pks[p]-pks[p-1])/2) # start of period is 5S before max
     } else {
-      ds <- min(data$freq*5, pks[p]) # else start = either start of trial or 5s before max
+      ds <- min(data$freq*7.5, pks[p]-1) # else start = either start of trial or 5s before max
     }
     # end of period
     if (p < length(pks)) { # if not last rep
@@ -103,38 +123,29 @@ nReps <- function(data) {
     }
     w = (pks[p]-ds):(pks[p]+de)
     
-    # look for valleys either side of max
-    vys <- find_peaks(-data$df$Total[w], m = 50)
-    vys <- vys[which(data$df$Total[w[vys]] < cutoff)]
-    
     # start and end of each rep are valleys closest to max
-    pk <- min(which(data$df$Total[w] == max(data$df$Total[w])))
-    rs <- vys[max(which(vys < pk))]
-    re <- vys[min(which(vys > pk))]
+    r <- find_rep(data$df$Total[w], (pks[p] - w[1]) + 1, 500)
+    rs <- r$start
+    re <- r$end
     
     # redefine rep
     # start of rep
     ps <- min(data$freq*1.5, rs-1)
     # end of rep
-    if (p < length(pks)) { # if not last rep
-      pe <- data$freq*1.5 # end of rep = 1.5s after end of pull
-    } else {
-      pe <- min(data$freq*1.5, length(w)-re) # else end of rep = either end of trial or 1.5s after end of pull
-    }
+    pe <- min(data$freq*1.5, length(w)-re) # end of rep = either end of trial or 1.5s after end of pull
     w <- w[rs-ps]:w[re+pe]
     
     if (length(pks) > 1) {
-      n <- paste(data$fn,'_',p)
+      n <- paste0(data$fn,'_',p)
       data[[n]] <- data$df[w,]
       
-      data$fmaxi[p] <- (pks[p] - w[1]) + 1
-      
+      data$fmaxi[p] <- which(data[[n]]$Total == max(data[[n]]$Total))
       if (p == length(pks)) {
         data$df <- NULL
       }
     } else {
       data[[data$fn]] <- data$df[w,]
-      data$fmaxi <- (pks - w[1]) + 1
+      data$fmaxi <- which(data[[data$fn]]$Total == max(data[[data$fn]]$Total))
       
       data$df <- NULL
     }
@@ -144,20 +155,18 @@ nReps <- function(data) {
 
 
 # Determine start and end of pull --------------------------------------------------------
-pull <- function(data) {
-  reps <- names(data)[which(grepl(data$fn,names(data)))]
+pull <- function(data,wp) {
+  reps <- names(data)[which(grepl(data$fn,names(data),fixed = T))]
   pull <- matrix(0,length(reps),2)
   colnames(pull) <- c('start','end')
   
   for (r in 1:length(reps)) {
     rn <- reps[r]
     # noise = 5 SD of 1 s weighing period before pull
-    # threshold for start of pull = mean force during 1st second + noise
-    spt <- mean(data[[rn]]$Total[1:(data$freq*1)]) + (sd(data[[rn]]$Total[1:(data$freq*1)])*5)
-    
     # start and end of pull = last and first instance when force < start of pull threshold
-    pull[r,1] <- max(which(data[[rn]]$Total[1:data$fmaxi[r]] < spt))
-    pull[r,2] <- min(which(data[[rn]]$Total[data$fmaxi[r]:length(data[[rn]]$Total)] < spt)) + data$fmaxi[r]
+    p <- find_rep(data[[rn]]$Total, data$fmaxi[r], data$freq*wp)
+    pull[r,1] <- p$start
+    pull[r,2] <- p$end
   }
   data$pull <- pull
   return(data)
@@ -166,7 +175,7 @@ pull <- function(data) {
 
 # Check for indicators of poor trial -----------------------------------------------------
 qualityCheck <- function(data) {
-  reps <- names(data)[which(grepl(data$fn,names(data)))]
+  reps <- names(data)[which(grepl(data$fn,names(data),fixed = T))]
   data$warn <- list()
   for (r in 1:length(reps)) {
     rn <- reps[r]
@@ -176,7 +185,8 @@ qualityCheck <- function(data) {
     i <- 1
     
     # unstable weighing period before pull (change in force > 50 N)
-    if (any(diff(data[[rn]]$Total[1:sp]) > 50)) {
+    # if (any(diff(data[[rn]]$Total[1:sp]) > 50)) {
+    if (min(movstd(data[[rn]]$Total[1:sp],1000), na.rm = T) > 10) {
       data$warn[[rn]][[i]] <- "This rep does not have a stable weighing period"
       i <- i+1
     }
@@ -209,7 +219,7 @@ qualityCheck <- function(data) {
 
 # Performance metrics --------------------------------------------------------------------
 perfMetrics <- function(data) {
-  reps <- names(data)[which(grepl(data$fn,names(data)))]
+  reps <- names(data)[which(grepl(data$fn,names(data),fixed = T))]
   pm <- as.data.frame(matrix(0, length(reps),13))
   colnames(pm) <- c('peak force', 'relative peak force', 'time to peak force', paste('RFD',seq(50,250,50)), 
                     paste('J-',seq(50,250,50)))

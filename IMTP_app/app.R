@@ -64,7 +64,7 @@ server <- function(input, output) {
       for (i in 1:numfiles) {
         data <- importTrial(input$file[[i,'datapath']],input$file[[i,'name']]) # import and prepare trial
         data <- nReps(data) # check for multiple reps and cut trial accordingly
-        data <- pull(data) # determine start and end of pull
+        data <- pull(data,1) # determine start and end of pull
         data <- qualityCheck(data)
         data <- perfMetrics(data) # calculate performance metrics
         
@@ -88,7 +88,7 @@ server <- function(input, output) {
   
   # Plot each rep in a separate tab and print associated quality warnings
   repTabs <- function(fn) {
-    reps <- names(getData()[[fn]])[which(grepl(fn,names(getData()[[fn]])))]
+    reps <- names(getData()[[fn]])[which(grepl(fn,names(getData()[[fn]]),fixed = T))]
     rTabs <- lapply(1:length(reps), function(r) {
       rn <- reps[r]
       tabPanel(paste('Rep',r), renderPlot({
