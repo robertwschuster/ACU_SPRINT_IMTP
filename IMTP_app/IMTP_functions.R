@@ -185,7 +185,6 @@ qualityCheck <- function(data) {
     i <- 1
     
     # unstable weighing period before pull (change in force > 50 N)
-    # if (any(diff(data[[rn]]$Total[1:sp]) > 50)) {
     if (min(movstd(data[[rn]]$Total[1:sp],1000), na.rm = T) > 10) {
       data$warn[[rn]][[i]] <- "This rep does not have a stable weighing period"
       i <- i+1
@@ -208,7 +207,7 @@ qualityCheck <- function(data) {
     # countermovement before pull
     # CM threshold = mean force of 1st second - 5 SD of force during 1st second
     cmt <- mean(data[[rn]]$Total[1:(data$freq*1)]) - (sd(data[[rn]]$Total[1:(data$freq*1)])*5)
-    if (any(data[[rn]]$Total[sp-(data$freq*0.5):sp] < cmt)) {
+    if (any(data[[rn]]$Total[(sp - data$freq*0.5):sp] < cmt)) {
       data$warn[[rn]][[i]] <- "This rep contains a countermovement prior to the pull"
       i <- i+1
     }

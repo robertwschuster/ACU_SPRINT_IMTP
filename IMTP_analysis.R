@@ -218,7 +218,6 @@ for (f in 1:length(data)) {
   points(x = data[[f]]$Time[fmaxi[[f]]], y = data[[f]]$Total[fmaxi[[f]]], col = "blue", pch = 8, lwd = 2)
   
   # unstable weighing period before pull (change in force > 50 N)
-  # if (any(diff(data[[f]]$Total[1:sp]) > 50)) {
   if (min(movstd(data[[f]]$Total[1:sp],1000), na.rm = T) > 10) {
     ptq[f,1] <- 'X'
     # message(paste("Warning:", names(data)[f], "does not have a stable weighing period"))
@@ -256,7 +255,7 @@ for (f in 1:length(data)) {
   # countermovement before pull
   # CM threshold = mean force of 1st second - 5 SD of force during 1st second
   cmt <- mean(data[[f]]$Total[1:(freq[[f]]*1)]) - (sd(data[[f]]$Total[1:(freq[[f]]*1)])*5)
-  if (any(data[[f]]$Total[sp-(freq[[f]]*0.5):sp] < cmt)) {
+  if (any(data[[f]]$Total[(sp - freq[[f]]*0.5):sp] < cmt)) {
     ptq[f,4] <- 'X'
     # message(paste("Warning:", names(data)[f], "contains a countermovement prior to the pull"))
     # # ask whether to continue processing or not
