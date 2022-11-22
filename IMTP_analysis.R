@@ -43,7 +43,9 @@ find_rep <- function(fz, fmaxi, width = 500) {
   baseline <- mean(fz[(coi - width):(coi - 1)])
   
   out <- list(start = max(which(fz[1:fmaxi] <= (baseline + cutoff*5))),
-              end = min(which(fz[fmaxi:length(fz)] <= (baseline + cutoff*5))) + fmaxi)
+              end = ifelse(all(fz[fmaxi:length(fz)] > (baseline + cutoff*5)),
+                           which(fz[fmaxi:length(fz)] == min(fz[fmaxi:length(fz)])) + fmaxi,
+                           min(which(fz[fmaxi:length(fz)] <= (baseline + cutoff*5))) + fmaxi))
   return(out)
 }
 
@@ -131,7 +133,6 @@ for (f in fnames) {
   }
   points(x = data[[f]]$Time[c(1:nrow(data[[f]]))[pks]], y = data[[f]]$Total[pks], col = "red", pch = 16)
 
-  
   # find valleys left and right of peaks to determine start and end of rep
   for (p in 1:length(pks)) {
     # define arbitrary period to look for start and end of rep
@@ -141,14 +142,13 @@ for (f in fnames) {
     } else {
       ds <- min(freq[[f]]*7.5, pks[p]-1) # else start = either start of trial or 5s before max
     }
-    
     # end of period
     if (p < length(pks)) { # if not last rep
       de <- min(freq[[f]]*5, (pks[p+1]-pks[p])/2) # end of period = halfway between two adjacent maxes
     } else {
       de <- min(freq[[f]]*5, length(data[[f]]$Total)-pks[p]) # else end of period = either end of trial or 5s after max
     }
-    w = (pks[p]-ds):(pks[p]+de)
+    w <- (pks[p]-ds):(pks[p]+de)
     
     # start and end of each rep
     r <- find_rep(data[[f]]$Total[w], (pks[p] - w[1]) + 1, 500)
@@ -317,4 +317,43 @@ if (grepl(ex,'y',ignore.case = T)) {
   write.csv(tbl, file = paste0(fp,'/',fn,'.csv'))
   rm(tbl)
 }
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+for (f in fnames) {
+  # find peaks (at least 2s apart from each other)
+  d <- freq[[f]]*2 # frequency * 2s
+  pks <- find_peaks(data[[f]]$Total, m = d)
+  plot(x = data[[f]]$Time, y = data[[f]]$Total, type = "l", lwd = 2, 
+       xlab = "Time [s]", ylab = "Force [N]", main = f)
+  # determine a cutoff under which all other peaks cannot be considered IMTP trials
+  cutoff <- (max(data[[f]]$Total[pks])-bodymass[[f]])/2 + bodymass[[f]] # half of BM normalised max force
+  # cutoff <- max(data[[fn]]$Total[pks])-250 # within 250 N of max value
+  abline(h = cutoff, col = "green", lty = "dashed")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

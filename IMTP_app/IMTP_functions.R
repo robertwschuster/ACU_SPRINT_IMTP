@@ -38,7 +38,9 @@ find_rep <- function(fz, fmaxi, width = 500) {
   baseline <- mean(fz[(coi - width):(coi - 1)])
   
   out <- list(start = max(which(fz[1:fmaxi] <= (baseline + cutoff*5))),
-              end = min(which(fz[fmaxi:length(fz)] <= (baseline + cutoff*5))) + fmaxi)
+              end = ifelse(all(fz[fmaxi:length(fz)] > (baseline + cutoff*5)),
+                           which(fz[fmaxi:length(fz)] == min(fz[fmaxi:length(fz)])) + fmaxi,
+                           min(which(fz[fmaxi:length(fz)] <= (baseline + cutoff*5))) + fmaxi))
   return(out)
 }
 
@@ -121,9 +123,9 @@ nReps <- function(data) {
     } else {
       de <- min(data$freq*5, length(data$df$Total)-pks[p]) # else end of period = either end of trial or 5s after max
     }
-    w = (pks[p]-ds):(pks[p]+de)
+    w <- (pks[p]-ds):(pks[p]+de)
     
-    # start and end of each rep are valleys closest to max
+    # start and end of each rep
     r <- find_rep(data$df$Total[w], (pks[p] - w[1]) + 1, 500)
     rs <- r$start
     re <- r$end
