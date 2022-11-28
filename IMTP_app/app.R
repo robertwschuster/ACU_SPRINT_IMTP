@@ -37,13 +37,15 @@ ui <- fluidPage(
       # Download button
       p('(You can select the rows you want to download by clicking them)'),
       downloadButton("downloadData", "Download selected rows", icon = icon("download"), 
-                     style="color: #333; background-color: #FFF; border-color: #333")
+                     style="color: #333; background-color: #FFF; border-color: #333"),
+      width = 3
     ),
     
     # Performance metrics table and graphs of each rep
     mainPanel(
       dataTableOutput('results'),
-      uiOutput('repTabs')
+      uiOutput('repTabs'),
+      width = 9
     )
   )
 )
@@ -121,7 +123,7 @@ server <- function(input, output) {
         fn <- basename(fns[f])
         tabPanel(fn, repTabs(fn))
       })
-      do.call(tabsetPanel, fTabs)
+      do.call(navlistPanel, fTabs)
     }
   })
   
